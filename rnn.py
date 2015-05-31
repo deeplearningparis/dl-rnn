@@ -3,37 +3,11 @@ import theano
 import theano.tensor as T
 from theano import shared 
 from collections import OrderedDict
+from init import init_weight
 
 dtype=T.config.floatX
 
-def init_weight(shape, name, sample='uni'):
-    if sample=='unishape':
-        return shared(value=np.asarray(np.random.uniform(
-                low=-np.sqrt(6. / (shape[0] + shape[1])),
-                high=np.sqrt(6. / (shape[0] + shape[1])),
-                size=shape), dtype=dtype), 
-                    name=name, borrow=True)
-    
-    if sample=='svd':
-        values = np.ndarray(shape, dtype=dtype)
-        for dx in xrange(shape[0]):
-            vals = np.random.uniform(low=-1., high=1.,  size=(shape[1],))
-            values[dx,:] = vals
-        _,svs,_ = np.linalg.svd(values)
-        #svs[0] is the largest singular value                      
-        values = values / svs[0]
-        return shared(values, name=name, borrow=True)
-    
-    if sample=='uni':
-        return shared(value=np.asarray(np.random.uniform(low=-0.1,high=0.1, size=shape), dtype=dtype), 
-                      name=name, borrow=True)
-    
-    if sample=='zero':
-        return shared(value=np.zeros(shape=shape, dtype=dtype), 
-                      name=name, borrow=True)
-    
-    
-    raise "error bad sample technique"
+print "loaded rnn.py"
 
 class RnnMiniBatch:
     def __init__(self, n_in, n_hid, n_out, lr=0.05, batch_size=64):   
@@ -55,14 +29,15 @@ class RnnMiniBatch:
         X = T.tensor3() # batch of sequence of vector
         Y = T.tensor3() # batch of sequence of vector (should be 0 when X is not null) 
         h0 = shared(np.zeros(shape=(batch_size,self.n_hid), dtype=dtype)) # initial hidden state         
-        mask = 1. - X.sum(axis = 1)
+        mask = 1. - X.sum(axis = 2)
         lr = shared(np.cast[dtype](lr))
         
         [h_vals, y_vals], _ = theano.scan(fn=step,        
-                                          sequences=X,
+                                          sequences=X.dimshuffle(1,0,2),
                                           outputs_info=[h0, None])
-        
-        cost = (T.nnet.binary_crossentropy(y_vals.dimshuffle(1,0,2), Y) * mask).sum()        
+
+        cxe = T.nnet.categorical_crossentropy(y_vals.dimshuffle(1,0,2), Y)
+        cost = (cxe * mask).sum()        
         gparams = T.grad(cost, self.params)
         updates = OrderedDict()
         for param, gparam in zip(self.params, gparams):
@@ -70,4 +45,4 @@ class RnnMiniBatch:
         
         self.train = theano.function(inputs = [X, Y], outputs = cost, updates=updates)
         self.predictions = theano.function(inputs = [X], outputs = y_vals[-1,0,:])
-    
+        self.debug = theano.function(inputs = [X, Y], outputs = [X.shape, Y.shape, y_vals.shape, mask.shape, cxe.shape])
