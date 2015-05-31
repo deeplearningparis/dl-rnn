@@ -3,35 +3,35 @@ import theano
 import theano.tensor as T
 from theano import shared 
 
-dtype=T.config.floatX
+dtype = T.config.floatX
 
-print "loaded init.py"
+print("loading init.py")
 
-def init_weight(shape, name, sample='uni'):
-    if sample=='unishape':
-        return shared(value=np.asarray(np.random.uniform(
-                low=-np.sqrt(6. / (shape[0] + shape[1])),
-                high=np.sqrt(6. / (shape[0] + shape[1])),
-                size=shape), dtype=dtype), 
-                    name=name, borrow=True)
-    
-    if sample=='svd':
-        values = np.ndarray(shape, dtype=dtype)
-        for dx in xrange(shape[0]):
-            vals = np.random.uniform(low=-1., high=1.,  size=(shape[1],))
-            values[dx,:] = vals
-        _,svs,_ = np.linalg.svd(values)
-        #svs[0] is the largest singular value                      
+
+def init_weight(shape, name, sample='uni', seed=None):
+    rng = np.random.RandomState(seed)
+
+    if sample == 'unishape':
+        values = rng.uniform(
+            low=-np.sqrt(6. / (shape[0] + shape[1])),
+            high=np.sqrt(6. / (shape[0] + shape[1])),
+            size=shape).astype(dtype)
+
+    elif sample == 'svd':
+        values = rng.uniform(low=-1., high=1., size=shape).astype(dtype)
+        _, svs, _ = np.linalg.svd(values)
+        # svs[0] is the largest singular value
         values = values / svs[0]
-        return shared(values, name=name, borrow=True)
+
+    elif sample == 'uni':
+        values = rng.uniform(low=-0.1, high=0.1, size=shape).astype(dtype)
     
-    if sample=='uni':
-        return shared(value=np.asarray(np.random.uniform(low=-0.1,high=0.1, size=shape), dtype=dtype), 
-                      name=name, borrow=True)
-    
-    if sample=='zero':
-        return shared(value=np.zeros(shape=shape, dtype=dtype), 
-                      name=name, borrow=True)
-    
-    
-    raise "error bad sample technique"
+    elif sample == 'zero':
+        values = np.zeros(shape=shape, dtype=dtype)
+
+    else:
+        raise ValueError("Unsupported initialization scheme: %s"
+                         % sample)
+
+    return shared(values, name=name, borrow=True)
+
