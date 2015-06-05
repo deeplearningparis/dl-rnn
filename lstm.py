@@ -10,7 +10,7 @@ dtype=T.config.floatX
 print "loaded lstm.py"
 
 class Lstm:
-    def __init__(self, n_in, n_lstm, n_out, lr=0.05, single_output=True):        
+    def __init__(self, n_in, n_lstm, n_out, lr=0.05, single_output=True, output_activation=T.nnet.softmax, cost_function='nll'):        
         self.n_in = n_in
         self.n_lstm = n_lstm
         self.n_out = n_out
@@ -58,21 +58,24 @@ class Lstm:
         [h_vals, c_vals, y_vals], _ = theano.scan(fn=step_lstm,        
                                           sequences=X,
                                           outputs_info=[h0, c0, None])
+
         if single_output:
-            self.output = y_vals[-1]
-            nll = -T.mean(Y * T.log(y_vals)+ (1.- Y) * T.log(1. - y_vals))
-            #nll = -T.mean(T.log(self.output)[T.arange(Y.shape[0]), T.iround(Y)])            
-            mse = T.mean((self.output - Y) ** 2)
-            #cost = T.mean(cxe)        
-            cost = nll
+            self.output = y_vals[-1]            
         else:
-            cxe = T.nnet.categorical_crossentropy(self.output, Y)
             self.output = y_vals
-
+        
+        cxe = T.mean(T.nnet.binary_crossentropy(self.output, Y))
+        nll = -T.mean(Y * T.log(self.output)+ (1.- Y) * T.log(1. - self.output))     
         mse = T.mean((self.output - Y) ** 2)
-        nnl = -T.mean(Y * T.log(self.output)+ (1.- Y) * T.log(1. - self.output))
 
-        cost = nll
+        cost = 0
+        if cost_function == 'mse':
+            cost = mse
+        elif cost_function == 'cxe':
+            cost = cxe
+        else:
+            cost = nll
+        
         gparams = T.grad(cost, self.params)
         updates = OrderedDict()
         for param, gparam in zip(self.params, gparams):
@@ -85,7 +88,7 @@ class Lstm:
 
 
 class LstmMiniBatch:
-    def __init__(self, n_in, n_lstm, n_out, lr=0.05, batch_size=64):        
+    def __init__(self, n_in, n_lstm, n_out, lr=0.05, batch_size=64, single_output=True, output_activation=T.nnet.softmax, cost_function='nll'):        
         self.n_in = n_in
         self.n_lstm = n_lstm
         self.n_out = n_out
@@ -132,10 +135,24 @@ class LstmMiniBatch:
         [h_vals, c_vals, y_vals], _ = theano.scan(fn=step_lstm,        
                                           sequences=X.dimshuffle(1,0,2),
                                           outputs_info=[h0, c0, None])
-        mse = T.mean((y_vals.dimshuffle(1,0,2) - Y) ** 2)
-        cxe = T.nnet.categorical_crossentropy(y_vals.dimshuffle(1,0,2), Y)
-        #cost = (mse * mask).sum()
-        cost = mse
+
+        if single_output:
+            self.output = y_vals[-1]            
+        else:
+            self.output = y_vals.dimshuffle(1,0,2)
+        
+        cxe = T.mean(T.nnet.binary_crossentropy(self.output, Y))
+        nll = -T.mean(Y * T.log(self.output)+ (1.- Y) * T.log(1. - self.output))     
+        mse = T.mean((self.output - Y) ** 2)
+
+        cost = 0
+        if cost_function == 'mse':
+            cost = mse
+        elif cost_function == 'cxe':
+            cost = cxe
+        else:
+            cost = nll 
+        
         gparams = T.grad(cost, self.params)
         updates = OrderedDict()
         for param, gparam in zip(self.params, gparams):
