@@ -129,7 +129,6 @@ class LstmMiniBatch:
         Y = T.tensor3() # batch of sequence of vector (should be 0 when X is not null) 
         h0 = shared(np.zeros(shape=(batch_size,self.n_lstm), dtype=dtype)) # initial hidden state         
         c0 = shared(np.zeros(shape=(batch_size,self.n_lstm), dtype=dtype)) # initial hidden state         
-        mask = 1. - X.sum(axis = 2)
         lr = shared(np.cast[dtype](lr))
         
         [h_vals, c_vals, y_vals], _ = theano.scan(fn=step_lstm,        
@@ -161,5 +160,4 @@ class LstmMiniBatch:
         self.loss = theano.function(inputs = [X, Y], outputs = [cxe, mse, cost])
         self.train = theano.function(inputs = [X, Y], outputs = cost, updates=updates)
         self.predictions = theano.function(inputs = [X], outputs = y_vals.dimshuffle(1,0,2))
-        self.debug = theano.function(inputs = [X, Y], outputs = [X.shape, Y.shape, y_vals.shape, mask.shape, cxe.shape])
-        self.mask = theano.function(inputs = [X], outputs = mask)
+        self.debug = theano.function(inputs = [X, Y], outputs = [X.shape, Y.shape, y_vals.shape, cxe.shape])

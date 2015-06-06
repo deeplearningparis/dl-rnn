@@ -31,7 +31,7 @@ class Rnn:
 
         def step(x_t, h_tm1):
             h_t = T.tanh(T.dot(x_t, self.W_in) + T.dot(h_tm1, self.W_rec) + self.b_hid)
-            y_t = T.nnet.softmax(T.dot(h_t, self.W_out) + self.b_out)
+            y_t = self.activation(T.dot(h_t, self.W_out) + self.b_out)
             return [h_t, y_t]
 
         X = T.matrix() # sequence of vector
@@ -102,8 +102,7 @@ class RnnMiniBatch:
             Y = T.matrix() 
         else:
             Y = T.tensor3()
-        h0 = shared(np.zeros(shape=(batch_size,self.n_hid), dtype=dtype)) # initial hidden state         
-        mask = 1. - X.sum(axis = 2)
+        h0 = shared(np.zeros(shape=(batch_size,self.n_hid), dtype=dtype)) # initial hidden state                 
         lr = shared(np.cast[dtype](lr))
         
         [h_vals, y_vals], _ = theano.scan(fn=step,        
@@ -135,4 +134,4 @@ class RnnMiniBatch:
         self.loss = theano.function(inputs = [X, Y], outputs = cost)
         self.train = theano.function(inputs = [X, Y], outputs = cost, updates=updates)
         self.predictions = theano.function(inputs = [X], outputs = self.output)
-        self.debug = theano.function(inputs = [X, Y], outputs = [X.shape, Y.shape, y_vals.shape, mask.shape, self.output.shape])
+        self.debug = theano.function(inputs = [X, Y], outputs = [X.shape, Y.shape, y_vals.shape, self.output.shape])
